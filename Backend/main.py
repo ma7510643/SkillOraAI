@@ -168,11 +168,19 @@ async def analyze(file: UploadFile = File(...), job_description: str = Form(...)
 
 app = FastAPI()
 
+# BASE_DIR is .../skillora-ai/Backend
 BASE_DIR = Path(__file__).resolve().parent
 
+# ROOT_DIR is .../skillora-ai (one level up, where login.html sits)
 ROOT_DIR = BASE_DIR.parent
 
-app.mount("/", StaticFiles(directory=ROOT_DIR, html=True), name="frontend")
+# 1. Direct root URL (/) to serve login.html
+@app.get("/")
+async def serve_root():
+    return FileResponse(ROOT_DIR / "login.html")
+
+# 2. Mount static files so relative CSS, JS, and images load properly
+app.mount("/", StaticFiles(directory=ROOT_DIR), name="static")
 
 
 
