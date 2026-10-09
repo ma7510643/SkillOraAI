@@ -169,12 +169,10 @@ async def analyze(file: UploadFile = File(...), job_description: str = Form(...)
 app = FastAPI()
 
 BASE_DIR = Path(__file__).resolve().parent
-FRONTEND_DIR = BASE_DIR / "frontend"
 
-if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-else:
-    print(f"Warning: Directory '{FRONTEND_DIR}' does not exist. Skipping static mount.")
+ROOT_DIR = BASE_DIR.parent
+
+app.mount("/", StaticFiles(directory=ROOT_DIR, html=True), name="frontend")
 
 
 
