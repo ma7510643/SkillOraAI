@@ -22,6 +22,16 @@ from project import router as project_router
 from auth import router as auth_router
 from check_pdf import router as check_router
 
+app = FastAPI()
+
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+else:
+    print(f"Warning: Directory '{FRONTEND_DIR}' does not exist. Skipping static mount.")
+
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
