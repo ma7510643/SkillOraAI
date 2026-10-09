@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
@@ -23,18 +24,23 @@ from auth import router as auth_router
 from check_pdf import router as check_router
 
 BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
+
 load_dotenv(BASE_DIR / ".env")
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 FALLBACKS = [
     m.strip()
-    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash,gemini-3.1-flash-lite").split(",")
+    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash,gemini-1.5-flash").split(",")
     if m.strip()
 ]
 client = genai.Client(api_key=API_KEY) if API_KEY else None
 
+# Single FastAPI instance
 app = FastAPI(title="Resume AI")
+
+# Include all API Routers
 app.include_router(builder_router)
 app.include_router(company_router)
 app.include_router(report_router)
@@ -43,7 +49,6 @@ app.include_router(interview_router)
 app.include_router(project_router)
 app.include_router(auth_router)
 app.include_router(check_router)
-FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 PROMPT = """You are an expert resume reviewer for the Indian tech job market.
 A scoring program has ALREADY computed the numbers below. Do not change them
@@ -102,7 +107,7 @@ def call_ai(prompt: str) -> dict:
                 if busy:
                     time.sleep(2 * (attempt + 1))
                     continue
-                break  # e.g. 404 model not found: go to the next model
+                break
     raise RuntimeError(last_error)
 
 
@@ -135,11 +140,9 @@ async def analyze(file: UploadFile = File(...), job_description: str = Form(...)
     if len(resume_text.strip()) < 50:
         return {"error": "Could not read text from this PDF (it may be scanned)."}
 
-    # 1) scores computed by plain code (same input -> same output)
     scores = compute_scores(resume_text, job_description)
     result = {"scores": scores}
 
-    # 2) AI explanation (if the AI fails, scores are still returned)
     if client is None:
         result["ai_error"] = "GEMINI_API_KEY missing. Check backend/.env and restart the server."
         return result
@@ -166,22 +169,18 @@ async def analyze(file: UploadFile = File(...), job_description: str = Form(...)
 
     return result
 
-app = FastAPI()
 
-# BASE_DIR is .../skillora-ai/Backend
-BASE_DIR = Path(__file__).resolve().parent
-
-# ROOT_DIR is .../skillora-ai (one level up, where login.html sits)
-ROOT_DIR = BASE_DIR.parent
-
-# 1. Direct root URL (/) to serve login.html
+# 1. Serve login.html specifically for the root path (/)
 @app.get("/")
 async def serve_root():
-    return FileResponse(ROOT_DIR / "login.html")
+    login_path = ROOT_DIR / "login.html"
+    if login_path.exists():
+        return FileResponse(login_path)
+    return {"message": "login.html not found in root directory"}
 
-# 2. Mount static files so relative CSS, JS, and images load properly
-app.mount("/", StaticFiles(directory=ROOT_DIR), name="static")
 
+# 2. Mount root folder for serving static files (CSS, JS, images, secondary HTML pages)
+app.mount("/", StaticFiles(directory=ROOT_DIR, html=False), name="static")
 
 
 if __name__ == "__main__":
